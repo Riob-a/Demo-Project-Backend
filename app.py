@@ -1,0 +1,348 @@
+from flask import Flask, request, jsonify
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.exc import IntegrityError
+from flask_cors import CORS
+from flask_migrate import Migrate
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, get_jwt
+from functools import wraps
+from models import db, User, Artwork, Contact, Admin
+from werkzeug.security import generate_password_hash, check_password_hash
+import cloudinary
+from cloudinary.uploader import upload
+import cloudinary.api
+from dotenv import load_dotenv
+# from flask_mail import Mail, Message
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
+import os
+
+app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///App.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['JWT_SECRET_KEY'] = 'your-secret-key'  # Replace with a strong secret key
+
+# Load environment variables from .env file
+load_dotenv()
+
+cloudinary.config(
+    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.getenv("CLOUDINARY_API_KEY"),
+    api_secret=os.getenv("CLOUDINARY_API_SECRET")
+)
+# Mail configurations
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USERNAME'] = os.getenv("EMAIL_USER")  # Store in .env file
+app.config['MAIL_PASSWORD'] = os.getenv("EMAIL_PASS")  # Store in .env file
+app.config['MAIL_DEFAULT_SENDER'] = os.getenv("EMAIL_USER")
+
+mail = Mail(app)
+
+# Send grid
+sendgrid_client = SendGridAPIClient(os.getenv("SENDGRID_API_KEY"))
+
+# Initialize extensions
+db.init_app(app)
+migrate = Migrate(app, db)
+CORS(app)
+jwt = JWTManager(app)
+
+# Set to keep track of revoked tokens
+revoked_tokens = set()
+
+# Admin decorator
+def admin_required(fn):
+    @wraps(fn)
+    @jwt_required()
+    def wrapper(*args, **kwargs):
+        identity = get_jwt_identity()
+        if identity.get("role") != "admin":
+            return jsonify({"message": "Admin access required"}), 403
+        return fn(*args, **kwargs)
+    return wrapper
+
+# INDEX ROUTE
+@app.route('/')
+def home():
+    return jsonify({"message": "Welcome to Derrick's Demo"}), 200
+
+# USER ROUTES
+@app.route('/api/register', methods=['POST'])
+def register_user():
+    data = request.json
+    if User.query.filter_by(email=data['email']).first():
+        return jsonify({"message": "Email already registered"}), 409
+
+    new_user = User(
+        username=data['username'],
+        email=data['email']
+    )
+    new_user.set_password(data['password'])
+    db.session.add(new_user)
+    db.session.commit()
+
+    # Send confirmation email
+    send_confirmation_email(new_user.email, new_user.username)
+
+    return jsonify({"message": "User registered successfully"}), 201
+
+def send_confirmation_email(to_email, username):
+    subject = "Welcome to Derrick's Demo App!"
+    body = f"Hello {username},\n\nThank you for registering! We're excited to have you on board.\n\nBest regards,\nDerrick's Demo Team"
+
+    # Create a new message object
+    message = Mail(
+        from_email=os.getenv("EMAIL_USER"),  # Sender's email (registered with SendGrid)
+        to_emails=to_email,
+        subject=subject,
+        plain_text_content=body
+    )
+
+    # Send the email using SendGrid
+    try:
+        sendgrid_client = SendGridAPIClient(os.getenv("SENDGRID_API_KEY"))
+        response = sendgrid_client.send(message)
+        print(f"Email sent! Status Code: {response.status_code}")
+    except Exception as e:
+        print(f"An error occurred while sending the email: {e}")
+
+    # # Send the email
+    # with app.app_context():
+    #     mail.send(msg)
+
+@app.route('/api/signin', methods=['POST'])
+def sign_in():
+    data = request.json
+    user = User.query.filter_by(email=data['email']).first()
+    admin = Admin.query.filter_by(email=data['email']).first()
+    
+    if user and user.check_password(data['password']):
+        access_token = create_access_token(identity={"id": user.id})   # Create a token with user ID
+        return jsonify({
+            "message": "Sign-in successful",
+            "user": user.to_dict(),
+            "access_token": access_token
+        }), 200
+    elif admin and admin.check_password(data['password']):
+        access_token= create_access_token(identity={"id": admin.id, "role": "admin"})
+        return jsonify({
+            "message": "Sign-in successful (Admin)",
+            "user": admin.to_dict(),
+            "access_token": access_token
+        }),200
+    else:
+        return jsonify({"message": "Invalid email or password"}), 401
+
+@app.route('/api/logout', methods=['POST'])
+@jwt_required()
+def logout():
+    jti = get_jwt()['jti']  # Get JWT identity
+    response = jsonify({"message":"Logged out successfully"})
+    revoked_tokens.add(jti)    # Add the token ID to the revoked list
+    
+    return response, 200
+
+# JWT Revocation Check
+@jwt.token_in_blocklist_loader
+def check_if_token_revoked(jwt_header, jwt_payload):
+    return jwt_payload['jti'] in revoked_tokens
+
+@app.route('/api/users', methods=['GET'])
+@jwt_required()
+@admin_required
+def get_users():
+    users = User.query.all()
+    return jsonify([user.to_dict() for user in users]), 200
+
+@app.route('/api/users/<int:id>', methods=['GET'])
+@jwt_required()
+@admin_required
+def get_user(id):
+    user = User.query.get(id)
+    if not user:
+        return jsonify({'message':'User not Found'}),404
+    return jsonify(user.to_dict()),200
+
+@app.route('/api/users/<int:id>', methods=['DELETE'])
+@jwt_required()
+@admin_required
+def delete_user(id):
+    user = User.query.get(id)
+    if not user:
+        return jsonify({"message":"User not found"}), 404
+    db.session.delete(user)
+    db.session.commit()
+    return jsonify({'message':'User deleted succesfully'}),200
+
+# ARTWORK ROUTES
+@app.route('/api/artworks/submit', methods=['POST', 'OPTIONS'])
+@jwt_required()
+# @admin_required
+
+def submit_artwork():
+    if request.method == 'OPTIONS':
+        return '', 200  # CORS preflight handling
+    
+    current_user_id = get_jwt_identity().get("id")  # Get the current user's ID
+    data = request.form
+    image_file = request.files.get('image')  # Retrieve the image file from the form data
+
+    
+    if not image_file:
+        return jsonify({"message": "No image file provided"}), 400
+    
+    # Upload the image to Cloudinary
+    upload_result = upload(image_file)
+    image_url = upload_result.get('secure_url')  # Get the secure URL from Cloudinary
+
+    new_artwork = Artwork(
+        name=data['name'],
+        email=data['email'],
+        image_url=image_url,  # Save the Cloudinary URL
+        style=data['style'],
+        description=data['description'],
+        user_id=current_user_id  # Link to the logged-in user
+    )
+    db.session.add(new_artwork)
+    db.session.commit()
+
+    return jsonify({"message": "Artwork submitted successfully", "image_url": image_url}), 201
+
+@app.route('/api/artworks/<style>', methods=['GET'])
+@jwt_required()
+# @admin_required
+
+def get_artworks_by_style(style):
+    artworks = Artwork.query.filter_by(style=style).all()
+    return jsonify([artwork.to_dict() for artwork in artworks]), 200
+
+@app.route('/api/artworks/<int:id>', methods=['GET'])
+@jwt_required()
+@admin_required
+
+def get_artwork(id):
+    artwork = Artwork.query.get(id)
+    if not artwork:
+        return jsonify({"message": "Artwork not found"}), 404
+    return jsonify(artwork.to_dict()), 200
+
+@app.route('/api/users/<int:user_id>/artworks', methods=['GET'])
+@jwt_required()
+@admin_required  # Or allow users to fetch their own artworks
+def get_user_artworks(user_id):
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"message": "User not found"}), 404
+    
+    artworks = Artwork.query.filter_by(user_id=user_id).all()
+    return jsonify([artwork.to_dict() for artwork in artworks]), 200
+
+@app.route('/api/artworks/<int:id>', methods=['DELETE'])
+@jwt_required()
+@admin_required
+def delete_artwork(id):
+    artwork = Artwork.query.get(id)
+    if not artwork:
+        return jsonify({"message": "Artwork not found"}), 404
+    db.session.delete(artwork)
+    db.session.commit()
+    return jsonify({"message": "Artwork deleted successfully"}), 200
+
+# CONTACT ROUTES
+@app.route('/api/contact', methods=['POST'])
+@jwt_required()
+def create_contact():
+    data = request.json
+    new_contact = Contact(
+        name=data['name'],
+        email=data['email'],
+        message=data['message']
+    )
+    db.session.add(new_contact)
+    db.session.commit()
+    return jsonify({"message": "Contact message submitted successfully"}), 201
+
+@app.route('/api/contacts', methods=['GET'])
+@jwt_required()
+@admin_required
+def get_contacts():
+    contacts = Contact.query.all()
+    return jsonify([contact.to_dict() for contact in contacts]), 200
+
+@app.route('/api/contacts/email/<email>', methods=['GET'])
+@jwt_required()
+@admin_required
+def get_contacts_by_email(email):
+    contacts = Contact.query.filter_by(email=email).all()
+    return jsonify([contact.to_dict() for contact in contacts]), 200
+
+# GET a single contact by ID
+@app.route('/api/contacts/<int:id>', methods=['GET'])
+@jwt_required()
+@admin_required
+def get_contact(id):
+    contact = Contact.query.get(id)
+    if not contact:
+        return jsonify({"message": "Contact not found"}), 404
+    return jsonify(contact.to_dict()), 200
+
+# DELETE a single contact by ID
+@app.route('/api/contacts/<int:id>', methods=['DELETE'])
+# @jwt_required()
+@admin_required
+def delete_contact(id):
+    contact = Contact.query.get(id)
+    if not contact:
+        return jsonify({"message": "Contact not found"}), 404
+    db.session.delete(contact)
+    db.session.commit()
+    return jsonify({"message": "Contact deleted successfully"}), 200
+
+# Admin routes
+@app.route('/api/admin-register', methods=['POST'])
+def admin_register():
+    data = request.get_json()
+    username = data.get('username')
+    email = data.get('email')
+    password = data.get('password')
+    role = data.get('role', 'admin')  # Default to 'admin' if no role is provided
+    
+    # Create a new admin object without the password hash
+    new_admin = Admin(username=username, email=email, role=role)
+    
+    # Hash the password and set it on the admin object
+    new_admin.set_password(password)
+    
+    # Example of checking the password (normally done during login)
+    if new_admin.check_password(password):
+        print("Password is correct")  # This would typically happen during login, not registration
+    else:
+        print("Password is incorrect")
+
+    try:
+        db.session.add(new_admin)
+        db.session.commit()
+        return jsonify({"message": "Admin registered successfully!"}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+    
+@app.route('/api/admin-login', methods=['POST'])
+def admin_login():
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+    
+    # Look up the admin by username
+    admin = Admin.query.filter_by(username=username).first()
+    
+    if admin and admin.check_password(password):
+        return jsonify({"message": "Login successful!"}), 200
+    else:
+        return jsonify({"error": "Invalid username or password"}), 401
+    
+
+
+if __name__ == '__main__':
+    app.run(debug=True)
