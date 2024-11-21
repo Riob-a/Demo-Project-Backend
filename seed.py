@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from models import db, User, Artwork, Contact
 from flask import Flask
 from werkzeug.security import generate_password_hash
