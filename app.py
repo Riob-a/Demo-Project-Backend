@@ -175,6 +175,28 @@ def delete_user(id):
     db.session.commit()
     return jsonify({'message':'User deleted succesfully'}),200
 
+@app.route('/api/users/<int:id>', methods=['PUT'])
+@jwt_required()
+def update_user(id):
+    current_user_id = get_jwt_identity().get("id")
+    if current_user_id != id:
+        return jsonify({"message": "You can only update your own profile"}), 403
+    
+    user = User.query.get(id)
+    if not user:
+        return jsonify({"message": "User not found"}), 404
+    
+    data = request.json
+    user.username = data.get('username', user.username)
+    user.email = data.get('email', user.email)
+    
+    if 'password' in data:
+        user.set_password(data['password'])
+    
+    db.session.commit()
+    return jsonify({"message": "User profile updated successfully"}), 200
+
+
 # ARTWORK ROUTES
 @app.route('/api/artworks/submit', methods=['POST', 'OPTIONS'])
 @jwt_required()
