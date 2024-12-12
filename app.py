@@ -260,7 +260,7 @@ def get_artwork(id):
 
 @app.route('/api/users/<int:user_id>/artworks', methods=['GET'])
 @jwt_required()
-@admin_required  # Or allow users to fetch their own artworks
+# @admin_required  # Or allow users to fetch their own artworks
 def get_user_artworks(user_id):
     user = User.query.get(user_id)
     if not user:
