@@ -196,6 +196,15 @@ def update_user(id):
     db.session.commit()
     return jsonify({"message": "User profile updated successfully"}), 200
 
+@app.route('/api/users/me', methods=['GET'])
+@jwt_required()
+def get_user_profile():
+    current_user_id = get_jwt_identity().get("id")
+    user = User.query.get(current_user_id)
+    if not user:
+        return jsonify({"message": "User not found"}), 404
+    return jsonify(user.to_dict()), 200
+
 
 # ARTWORK ROUTES
 @app.route('/api/artworks/submit', methods=['POST', 'OPTIONS'])
