@@ -229,39 +229,34 @@ def delete_user(id):
 
 @app.route('/api/users/<int:id>', methods=['PUT'])
 @jwt_required()
-def update_user_by_id(id):
+def update_user(id):
     current_user_id = get_jwt_identity().get("id")
     if current_user_id != id:
         return jsonify({"message": "You can only update your own profile"}), 403
-
-    # Query the user by ID
+    
     user = User.query.get(id)
     if not user:
         return jsonify({"message": "User not found"}), 404
-
-    # Get JSON data and files from the request
-    data = request.form
-    profile_image = request.files.get('profile_image')
-
-    # Update fields if provided
+    
+    data = request.json
     user.username = data.get('username', user.username)
     user.email = data.get('email', user.email)
-
-    # Update password if provided
+    
     if 'password' in data:
         user.set_password(data['password'])
-
+    
     # Handle profile image upload
+    profile_image = request.files.get('profile_image')
     if profile_image:
         try:
             upload_result = upload(profile_image)
-            user.profile_image = upload_result['secure_url']
+            user.profile_image = upload_result.get('secure_url')
         except Exception as e:
             return jsonify({"message": f"Image upload failed: {str(e)}"}), 400
 
-    # Commit changes to the database
     db.session.commit()
-    return jsonify({"message": "User profile updated successfully", "user": user.to_dict()}), 200
+    return jsonify({"message": "User profile updated successfully"}), 200
+
 
 
 # @app.route('/api/users/me', methods=['GET'])
@@ -276,10 +271,10 @@ def update_user_by_id(id):
 @app.route('/api/users/me', methods=['GET'])
 @jwt_required()
 def get_user_profile():
-    current_user_id = get_jwt_identity()
+    current_user_id = get_jwt_identity().get("id")
     user = User.query.get(current_user_id)
     if not user:
-        return jsonify({"message": "User not found."}), 404
+        return jsonify({"message": "User not found"}), 404
 
     data = request.form
     profile_image = request.files.get('profile_image')
@@ -291,12 +286,13 @@ def get_user_profile():
     if profile_image:
         try:
             upload_result = upload(profile_image)
-            user.profile_image = upload_result.get['secure_url']
+            user.profile_image = upload_result.get('secure_url')
         except Exception as e:
             return jsonify({"message": f"Image upload failed: {str(e)}"}), 400
 
     db.session.commit()
     return jsonify({"message": "Profile updated successfully.", "user": user.to_dict()}), 200
+
 
 # ARTWORK ROUTES
 @app.route('/api/artworks/submit', methods=['POST', 'OPTIONS'])
