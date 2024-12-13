@@ -374,6 +374,5 @@ def admin_login():
         return jsonify({"error": "Invalid username or password"}), 401
     
 
-
 if __name__ == '__main__':
     app.run(debug=True)
