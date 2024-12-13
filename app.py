@@ -91,12 +91,12 @@ def home():
 def register_user():
     data = request.form
     image_file = request.files.get('profile_image')  # Retrieve the image file
-    profile_image_url = None
+    profile_image = None
 
     if image_file:
         try:
             upload_result = upload(image_file)
-            profile_image_url = upload_result.get('secure_url')
+            profile_image = upload_result.get('secure_url')
         except Exception as e:
             return jsonify({"message": "Image upload failed", "error": str(e)}), 400
 
@@ -106,7 +106,7 @@ def register_user():
     new_user = User(
         username=data['username'],
         email=data['email'],
-        profile_image_url=profile_image_url  # Add profile image URL
+        profile_image=profile_image  # Add profile image URL
     )
     new_user.set_password(data['password'])
     db.session.add(new_user)
