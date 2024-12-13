@@ -11,6 +11,7 @@ class User(db.Model):
     email = db.Column(db.String(255), nullable=False, unique=True)
     password_hash = db.Column(db.String(500), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    profile_image = db.Column(db.String(500), nullable=True) 
     artworks = db.relationship('Artwork', backref='owner', lazy=True)  # Relationship to Artwork
 
     def set_password(self, password):
@@ -26,7 +27,8 @@ class User(db.Model):
             'id':self.id,
             'username':self.username,
             'email':self.email,
-            "created_at": self.created_at.strftime('%Y-%m-%d %H:%M:%S'), 
+            "created_at": self.created_at.strftime('%d-%m-%Y %H:%M:%S'),
+            'profile_image': self.profile_image  
         }
     
 class Artwork(db.Model):

@@ -68,15 +68,45 @@ def home():
     return jsonify({"message": "Welcome to Derrick's Demo"}), 200
 
 # USER ROUTES
+# @app.route('/api/register', methods=['POST'])
+# def register_user():
+#     data = request.json
+#     if User.query.filter_by(email=data['email']).first():
+#         return jsonify({"message": "Email already registered"}), 409
+
+#     new_user = User(
+#         username=data['username'],
+#         email=data['email']
+#     )
+#     new_user.set_password(data['password'])
+#     db.session.add(new_user)
+#     db.session.commit()
+
+#     # Send confirmation email
+#     send_confirmation_email(new_user.email, new_user.username)
+
+#     return jsonify({"message": "User registered successfully"}), 201
+
 @app.route('/api/register', methods=['POST'])
 def register_user():
-    data = request.json
+    data = request.form
+    image_file = request.files.get('profile_image')  # Retrieve the image file
+    profile_image_url = None
+
+    if image_file:
+        try:
+            upload_result = upload(image_file)
+            profile_image_url = upload_result.get('secure_url')
+        except Exception as e:
+            return jsonify({"message": "Image upload failed", "error": str(e)}), 400
+
     if User.query.filter_by(email=data['email']).first():
         return jsonify({"message": "Email already registered"}), 409
 
     new_user = User(
         username=data['username'],
-        email=data['email']
+        email=data['email'],
+        profile_image_url=profile_image_url  # Add profile image URL
     )
     new_user.set_password(data['password'])
     db.session.add(new_user)
@@ -86,6 +116,7 @@ def register_user():
     send_confirmation_email(new_user.email, new_user.username)
 
     return jsonify({"message": "User registered successfully"}), 201
+
 
 def send_confirmation_email(to_email, username):
     subject = "Welcome to Derrick's Demo App!"
@@ -175,36 +206,97 @@ def delete_user(id):
     db.session.commit()
     return jsonify({'message':'User deleted succesfully'}),200
 
+# @app.route('/api/users/<int:id>', methods=['PUT'])
+# @jwt_required()
+# def update_user(id):
+#     current_user_id = get_jwt_identity().get("id")
+#     if current_user_id != id:
+#         return jsonify({"message": "You can only update your own profile"}), 403
+    
+#     user = User.query.get(id)
+#     if not user:
+#         return jsonify({"message": "User not found"}), 404
+    
+#     data = request.json
+#     user.username = data.get('username', user.username)
+#     user.email = data.get('email', user.email)
+    
+#     if 'password' in data:
+#         user.set_password(data['password'])
+    
+#     db.session.commit()
+#     return jsonify({"message": "User profile updated successfully"}), 200
+
 @app.route('/api/users/<int:id>', methods=['PUT'])
 @jwt_required()
-def update_user(id):
+def update_user_by_id(id):
     current_user_id = get_jwt_identity().get("id")
     if current_user_id != id:
         return jsonify({"message": "You can only update your own profile"}), 403
-    
+
+    # Query the user by ID
     user = User.query.get(id)
     if not user:
         return jsonify({"message": "User not found"}), 404
-    
-    data = request.json
+
+    # Get JSON data and files from the request
+    data = request.form
+    profile_image = request.files.get('profile_image')
+
+    # Update fields if provided
     user.username = data.get('username', user.username)
     user.email = data.get('email', user.email)
-    
+
+    # Update password if provided
     if 'password' in data:
         user.set_password(data['password'])
-    
+
+    # Handle profile image upload
+    if profile_image:
+        try:
+            upload_result = upload(profile_image)
+            user.profile_image = upload_result['secure_url']
+        except Exception as e:
+            return jsonify({"message": f"Image upload failed: {str(e)}"}), 400
+
+    # Commit changes to the database
     db.session.commit()
-    return jsonify({"message": "User profile updated successfully"}), 200
+    return jsonify({"message": "User profile updated successfully", "user": user.to_dict()}), 200
+
+
+# @app.route('/api/users/me', methods=['GET'])
+# @jwt_required()
+# def get_user_profile():
+#     current_user_id = get_jwt_identity().get("id")
+#     user = User.query.get(current_user_id)
+#     if not user:
+#         return jsonify({"message": "User not found"}), 404
+#     return jsonify(user.to_dict()), 200
 
 @app.route('/api/users/me', methods=['GET'])
 @jwt_required()
 def get_user_profile():
-    current_user_id = get_jwt_identity().get("id")
+    current_user_id = get_jwt_identity()
     user = User.query.get(current_user_id)
     if not user:
-        return jsonify({"message": "User not found"}), 404
-    return jsonify(user.to_dict()), 200
+        return jsonify({"message": "User not found."}), 404
 
+    data = request.form
+    profile_image = request.files.get('profile_image')
+
+    if 'username' in data:
+        user.username = data['username']
+    if 'email' in data:
+        user.email = data['email']
+    if profile_image:
+        try:
+            upload_result = upload(profile_image)
+            user.profile_image = upload_result.get['secure_url']
+        except Exception as e:
+            return jsonify({"message": f"Image upload failed: {str(e)}"}), 400
+
+    db.session.commit()
+    return jsonify({"message": "Profile updated successfully.", "user": user.to_dict()}), 200
 
 # ARTWORK ROUTES
 @app.route('/api/artworks/submit', methods=['POST', 'OPTIONS'])
