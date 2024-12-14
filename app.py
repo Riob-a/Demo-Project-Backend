@@ -238,22 +238,23 @@ def update_user(id):
     if not user:
         return jsonify({"message": "User not found"}), 404
     
-    data = request.json
-    user.username = data.get('username', user.username)
-    user.email = data.get('email', user.email)
+    # Handle form fields
+    user.username = request.form.get('username', user.username)
+    user.email = request.form.get('email', user.email)
     
-    if 'password' in data:
-        user.set_password(data['password'])
+    # Handle password if provided
+    if 'password' in request.form:
+        user.set_password(request.form['password'])
     
     # Handle profile image upload
     profile_image = request.files.get('profile_image')
     if profile_image:
         try:
-            upload_result = upload(profile_image)
+            upload_result = upload(profile_image)  # Ensure this is properly defined
             user.profile_image = upload_result.get('secure_url')
         except Exception as e:
             return jsonify({"message": f"Image upload failed: {str(e)}"}), 400
-
+    
     db.session.commit()
     return jsonify({"message": "User profile updated successfully"}), 200
 
