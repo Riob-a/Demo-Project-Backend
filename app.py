@@ -373,6 +373,28 @@ def delete_contact(id):
     db.session.commit()
     return jsonify({"message": "Contact deleted successfully"}), 200
 
+@app.route('/api/users/me/contacts', methods=['GET'])
+@jwt_required()
+def get_user_contacts():
+    # Get the current user ID from the JWT token
+    current_user_id = get_jwt_identity().get("id")
+
+    # Query the user based on the ID
+    user = User.query.get(current_user_id)
+    if not user:
+        return jsonify({"message": "User not found"}), 404
+
+    # Query all contacts associated with the user
+    contacts = Contact.query.filter_by(email=user.email).all()
+
+    # If no contacts are found, return a message
+    if not contacts:
+        return jsonify({"message": "No contacts found"}), 404
+
+    # Convert the contacts to dictionaries and return them
+    return jsonify([contact.to_dict() for contact in contacts]), 200
+
+
 # Admin routes
 @app.route('/api/admin-register', methods=['POST'])
 def admin_register():

@@ -102,32 +102,3 @@ class Admin(db.Model):
             'created_at': self.created_at.isoformat(),
         }
 
-# @app.route('/api/users/<int:id>', methods=['PUT'])
-# @jwt_required()
-# def update_user(id):
-#     current_user_id = get_jwt_identity().get("id")
-#     if current_user_id != id:
-#         return jsonify({"message": "You can only update your own profile"}), 403
-    
-#     user = User.query.get(id)
-#     if not user:
-#         return jsonify({"message": "User not found"}), 404
-    
-#     data = request.json
-#     user.username = data.get('username', user.username)
-#     user.email = data.get('email', user.email)
-    
-#     if 'password' in data:
-#         user.set_password(data['password'])
-    
-#     # Handle profile image upload
-#     profile_image = request.files.get('profile_image')
-#     if profile_image:
-#         try:
-#             upload_result = upload(profile_image)
-#             user.profile_image = upload_result.get('secure_url')
-#         except Exception as e:
-#             return jsonify({"message": f"Image upload failed: {str(e)}"}), 400
-
-#     db.session.commit()
-#     return jsonify({"message": "User profile updated successfully"}), 200
