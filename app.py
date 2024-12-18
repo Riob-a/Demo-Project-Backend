@@ -412,7 +412,7 @@ def admin_register():
     
     # Example of checking the password (normally done during login)
     if new_admin.check_password(password):
-        print("Password is correct")  # This would typically happen during login, not registration
+        print("Password is correct") 
     else:
         print("Password is incorrect")
 
