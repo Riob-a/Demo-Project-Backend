@@ -230,7 +230,7 @@ def get_user_profile():
 
 # me goes here
 
-@app.route('/api/users/change-password', methods=['POST'])
+@app.route('/api/users/change-password', methods=['PUT'])
 @jwt_required()
 def change_password():
     current_user_id = get_jwt_identity().get("id")
