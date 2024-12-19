@@ -68,25 +68,6 @@ def home():
     return jsonify({"message": "Welcome to Derrick's Demo"}), 200
 
 # USER ROUTES
-# @app.route('/api/register', methods=['POST'])
-# def register_user():
-#     data = request.json
-#     if User.query.filter_by(email=data['email']).first():
-#         return jsonify({"message": "Email already registered"}), 409
-
-#     new_user = User(
-#         username=data['username'],
-#         email=data['email']
-#     )
-#     new_user.set_password(data['password'])
-#     db.session.add(new_user)
-#     db.session.commit()
-
-#     # Send confirmation email
-#     send_confirmation_email(new_user.email, new_user.username)
-
-#     return jsonify({"message": "User registered successfully"}), 201
-
 @app.route('/api/register', methods=['POST'])
 def register_user():
     data = request.form
@@ -248,6 +229,25 @@ def get_user_profile():
     return jsonify(user.to_dict()), 200
 
 # me goes here
+
+@app.route('/api/users/change-password', methods=['POST'])
+@jwt_required()
+def change_password():
+    current_user_id = get_jwt_identity().get("id")
+    data = request.get_json()
+    
+    old_password = data.get("old_password")
+    new_password = data.get("new_password")
+    if not old_password or not new_password:
+        return jsonify({"message": "Old password and new password are required"}), 400
+    
+    user = User.query.get(current_user_id)
+    if not user or not user.check_password(old_password):
+        return jsonify({"message": "Incorrect old password"}), 403
+    
+    user.set_password(new_password)
+    db.session.commit()
+    return jsonify({"message": "Password updated successfully"}), 200
 
 # ARTWORK ROUTES
 @app.route('/api/artworks/submit', methods=['POST', 'OPTIONS'])
