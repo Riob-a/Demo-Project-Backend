@@ -63,6 +63,13 @@ class ArtworkLike(db.Model):
 
     def __repr__(self):
         return f"<ArtworkLike artwork_id={self.artwork_id} user_id={self.user_id}>"
+    
+    def to_dict(self):
+        return{
+            "id":self.id,
+            "artwork_id":self.artwork_id,
+            "user_id":self.user_id,
+        }
 
 class Contact(db.Model):
     __tablename__='contact'
