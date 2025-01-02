@@ -55,6 +55,15 @@ class Artwork(db.Model):
             "user_id": self.user_id
         }
 
+class ArtworkLike(db.Model):
+    __tablename__ = 'artwork_likes'
+    id = db.Column(db.Integer, primary_key=True)
+    artwork_id = db.Column(db.Integer, db.ForeignKey('art.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+
+    def __repr__(self):
+        return f"<ArtworkLike artwork_id={self.artwork_id} user_id={self.user_id}>"
+
 class Contact(db.Model):
     __tablename__='contact'
     id=db.Column(db.Integer, primary_key=True)

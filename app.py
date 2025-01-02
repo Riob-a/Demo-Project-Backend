@@ -5,7 +5,7 @@ from flask_cors import CORS
 from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, get_jwt
 from functools import wraps
-from models import db, User, Artwork, Contact, Admin
+from models import db, User, Artwork, ArtworkLike, Contact, Admin
 from werkzeug.security import generate_password_hash, check_password_hash
 import cloudinary
 from cloudinary.uploader import upload
@@ -322,6 +322,60 @@ def delete_artwork(id):
     db.session.delete(artwork)
     db.session.commit()
     return jsonify({"message": "Artwork deleted successfully"}), 200
+
+@app.route('/api/artworks/<int:id>/like', methods=['POST'])
+@jwt_required()
+def like_artwork(id):
+    """
+    Handle liking an artwork by ID.
+    """
+    current_user_id = get_jwt_identity().get("id")  # Get the current user's ID
+
+    # Check if the artwork exists
+    artwork = Artwork.query.get(id)
+    if not artwork:
+        return jsonify({"message": "Artwork not found"}), 404
+
+    # Check if the user has already liked the artwork
+    existing_like = ArtworkLike.query.filter_by(artwork_id=id, user_id=current_user_id).first()
+    if existing_like:
+        return jsonify({"message": "You have already liked this artwork"}), 400
+
+    # Create a new like
+    new_like = ArtworkLike(artwork_id=id, user_id=current_user_id)
+    db.session.add(new_like)
+    db.session.commit()
+
+    # Optionally, return updated like count
+    like_count = ArtworkLike.query.filter_by(artwork_id=id).count()
+    return jsonify({"message": "Artwork liked successfully", "likes": like_count}), 200
+
+@app.route('/api/artworks/<int:id>/like', methods=['DELETE'])
+@jwt_required()
+def unlike_artwork(id):
+    """
+    Handle unliking an artwork by ID.
+    """
+    current_user_id = get_jwt_identity().get("id")  # Get the current user's ID
+
+    # Check if the artwork exists
+    artwork = Artwork.query.get(id)
+    if not artwork:
+        return jsonify({"message": "Artwork not found"}), 404
+
+    # Check if the user has liked the artwork
+    existing_like = ArtworkLike.query.filter_by(artwork_id=id, user_id=current_user_id).first()
+    if not existing_like:
+        return jsonify({"message": "You have not liked this artwork"}), 400
+
+    # Remove the like
+    db.session.delete(existing_like)
+    db.session.commit()
+
+    # Optionally, return updated like count
+    like_count = ArtworkLike.query.filter_by(artwork_id=id).count()
+    return jsonify({"message": "Artwork unliked successfully", "likes": like_count}), 200
+
 
 # CONTACT ROUTES
 @app.route('/api/contact', methods=['POST'])
