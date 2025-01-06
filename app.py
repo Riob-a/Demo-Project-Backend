@@ -339,7 +339,8 @@ def like_artwork(id):
     # Check if the user has already liked the artwork
     existing_like = ArtworkLike.query.filter_by(artwork_id=id, user_id=current_user_id).first()
     if existing_like:
-        return jsonify({"message": "You have already liked this artwork"}), 400
+        like_count = ArtworkLike.query.filter_by(artwork_id=id).count()
+        return jsonify({"message": "Artwork already liked", "likes": like_count}), 200
 
     # Create a new like
     new_like = ArtworkLike(artwork_id=id, user_id=current_user_id)
