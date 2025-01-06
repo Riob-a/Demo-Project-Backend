@@ -357,20 +357,24 @@ def unlike_artwork(id):
     Handle unliking an artwork by ID.
     """
     current_user_id = get_jwt_identity().get("id")  # Get the current user's ID
+    print(f"Attempting to unlike artwork ID: {id}, User ID: {current_user_id}")
 
     # Check if the artwork exists
     artwork = Artwork.query.get(id)
     if not artwork:
+        print(f"Artwork with ID {id} not found.")
         return jsonify({"message": "Artwork not found"}), 404
 
     # Check if the user has liked the artwork
     existing_like = ArtworkLike.query.filter_by(artwork_id=id, user_id=current_user_id).first()
     if not existing_like:
+        print(f"No like record found for Artwork ID {id} and User ID {current_user_id}.")
         return jsonify({"message": "You have not liked this artwork"}), 400
 
     # Remove the like
     db.session.delete(existing_like)
     db.session.commit()
+    print(f"Like removed for Artwork ID {id}, User ID {current_user_id}")
 
     # Optionally, return updated like count
     like_count = ArtworkLike.query.filter_by(artwork_id=id).count()
