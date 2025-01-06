@@ -288,29 +288,59 @@ def submit_artwork():
 # @admin_required
 
 def get_artworks_by_style(style):
+    """
+    Fetch artworks by style with their total likes.
+    """
     artworks = Artwork.query.filter_by(style=style).all()
-    return jsonify([artwork.to_dict() for artwork in artworks]), 200
+    artworks_with_likes = []
+
+    for artwork in artworks:
+        like_count = ArtworkLike.query.filter_by(artwork_id=artwork.id).count()
+        artwork_data = artwork.to_dict()
+        artwork_data["likes"] = like_count  # Add the likes count
+        artworks_with_likes.append(artwork_data)
+
+    return jsonify(artworks_with_likes), 200
 
 @app.route('/api/artworks/<int:id>', methods=['GET'])
 @jwt_required()
 @admin_required
 
 def get_artwork(id):
+    """
+    Fetch a single artwork by ID with its total likes.
+    """
     artwork = Artwork.query.get(id)
     if not artwork:
         return jsonify({"message": "Artwork not found"}), 404
-    return jsonify(artwork.to_dict()), 200
+
+    like_count = ArtworkLike.query.filter_by(artwork_id=id).count()
+    artwork_data = artwork.to_dict()
+    artwork_data["likes"] = like_count  # Add the likes count
+
+    return jsonify(artwork_data), 200
 
 @app.route('/api/users/<int:user_id>/artworks', methods=['GET'])
 @jwt_required()
 # @admin_required  # Or allow users to fetch their own artworks
 def get_user_artworks(user_id):
+    """
+    Fetch all artworks by a specific user with their total likes.
+    """
     user = User.query.get(user_id)
     if not user:
         return jsonify({"message": "User not found"}), 404
-    
+
     artworks = Artwork.query.filter_by(user_id=user_id).all()
-    return jsonify([artwork.to_dict() for artwork in artworks]), 200
+    artworks_with_likes = []
+
+    for artwork in artworks:
+        like_count = ArtworkLike.query.filter_by(artwork_id=artwork.id).count()
+        artwork_data = artwork.to_dict()
+        artwork_data["likes"] = like_count  # Add the likes count
+        artworks_with_likes.append(artwork_data)
+
+    return jsonify(artworks_with_likes), 200
 
 @app.route('/api/artworks/<int:id>', methods=['DELETE'])
 @jwt_required()
