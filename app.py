@@ -291,13 +291,16 @@ def get_artworks_by_style(style):
     """
     Fetch artworks by style with their total likes.
     """
+    current_user_id = get_jwt_identity().get("id")
     artworks = Artwork.query.filter_by(style=style).all()
     artworks_with_likes = []
 
     for artwork in artworks:
         like_count = ArtworkLike.query.filter_by(artwork_id=artwork.id).count()
+        user_has_liked = ArtworkLike.query.filter_by(artwork_id=artwork.id, user_id=current_user_id).first() is not None
         artwork_data = artwork.to_dict()
         artwork_data["likes"] = like_count  # Add the likes count
+        artwork_data["user_has_liked"] = user_has_liked
         artworks_with_likes.append(artwork_data)
 
     return jsonify(artworks_with_likes), 200
@@ -310,13 +313,17 @@ def get_artwork(id):
     """
     Fetch a single artwork by ID with its total likes.
     """
+    current_user_id = get_jwt_identity().get("id")
     artwork = Artwork.query.get(id)
     if not artwork:
         return jsonify({"message": "Artwork not found"}), 404
 
     like_count = ArtworkLike.query.filter_by(artwork_id=id).count()
+    user_has_liked = ArtworkLike.query.filter_by(artwork_id=id, user_id=current_user_id).first() is not None
     artwork_data = artwork.to_dict()
     artwork_data["likes"] = like_count  # Add the likes count
+    artwork_data["user_has_liked"] = user_has_liked  # Include user like status
+
 
     return jsonify(artwork_data), 200
 
