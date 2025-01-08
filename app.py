@@ -62,6 +62,17 @@ def admin_required(fn):
         return fn(*args, **kwargs)
     return wrapper
 
+#fetch kijes helper
+def get_artwork_data_with_likes(artwork, user_id):
+    """Returns artwork data with like count and user like status."""
+    like_count = ArtworkLike.query.filter_by(artwork_id=artwork.id).count()
+    user_has_liked = ArtworkLike.query.filter_by(artwork_id=artwork.id, user_id=user_id).first() is not None
+
+    artwork_data = artwork.to_dict()
+    artwork_data["likes"] = like_count
+    artwork_data["user_has_liked"] = user_has_liked
+    return artwork_data
+
 # INDEX ROUTE
 @app.route('/')
 def home():
@@ -293,16 +304,8 @@ def get_artworks_by_style(style):
     """
     current_user_id = get_jwt_identity().get("id")
     artworks = Artwork.query.filter_by(style=style).all()
-    artworks_with_likes = []
 
-    for artwork in artworks:
-        like_count = ArtworkLike.query.filter_by(artwork_id=artwork.id).count()
-        user_has_liked = ArtworkLike.query.filter_by(artwork_id=artwork.id, user_id=current_user_id).first() is not None
-        artwork_data = artwork.to_dict()
-        artwork_data["likes"] = like_count  # Add the likes count
-        artwork_data["user_has_liked"] = user_has_liked
-        artworks_with_likes.append(artwork_data)
-
+    artworks_with_likes = [get_artwork_data_with_likes(artwork, current_user_id) for artwork in artworks]
     return jsonify(artworks_with_likes), 200
 
 @app.route('/api/artworks/<int:id>', methods=['GET'])
@@ -318,13 +321,7 @@ def get_artwork(id):
     if not artwork:
         return jsonify({"message": "Artwork not found"}), 404
 
-    like_count = ArtworkLike.query.filter_by(artwork_id=id).count()
-    user_has_liked = ArtworkLike.query.filter_by(artwork_id=id, user_id=current_user_id).first() is not None
-    artwork_data = artwork.to_dict()
-    artwork_data["likes"] = like_count  # Add the likes count
-    artwork_data["user_has_liked"] = user_has_liked  # Include user like status
-
-
+    artwork_data = get_artwork_data_with_likes(artwork, current_user_id)
     return jsonify(artwork_data), 200
 
 @app.route('/api/users/<int:user_id>/artworks', methods=['GET'])
@@ -337,16 +334,11 @@ def get_user_artworks(user_id):
     user = User.query.get(user_id)
     if not user:
         return jsonify({"message": "User not found"}), 404
-
+    
+    current_user_id = get_jwt_identity().get("id")
     artworks = Artwork.query.filter_by(user_id=user_id).all()
-    artworks_with_likes = []
 
-    for artwork in artworks:
-        like_count = ArtworkLike.query.filter_by(artwork_id=artwork.id).count()
-        artwork_data = artwork.to_dict()
-        artwork_data["likes"] = like_count  # Add the likes count
-        artworks_with_likes.append(artwork_data)
-
+    artworks_with_likes = [get_artwork_data_with_likes(artwork, current_user_id) for artwork in artworks]
     return jsonify(artworks_with_likes), 200
 
 @app.route('/api/artworks/<int:id>', methods=['DELETE'])
