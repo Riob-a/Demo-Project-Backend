@@ -260,6 +260,29 @@ def change_password():
     db.session.commit()
     return jsonify({"message": "Password updated successfully"}), 200
 
+@app.route('/api/users/me/liked-artworks', methods=['GET'])
+@jwt_required()
+def get_liked_artworks():
+    """
+    Fetch all artworks liked by the currently authenticated user.
+    """
+    current_user_id = get_jwt_identity().get("id")  # Get the current user's ID
+
+    # Get all liked artwork records for the user
+    liked_artworks = ArtworkLike.query.filter_by(user_id=current_user_id).all()
+
+    if not liked_artworks:
+        return jsonify({"message": "No liked artworks found"}), 404
+
+    # Fetch artwork details for each liked record
+    liked_artwork_details = [
+        get_artwork_data_with_likes(artwork_like.artwork, current_user_id)
+        for artwork_like in liked_artworks
+    ]
+
+    return jsonify(liked_artwork_details), 200
+
+
 # ARTWORK ROUTES
 @app.route('/api/artworks/submit', methods=['POST', 'OPTIONS'])
 @jwt_required()
