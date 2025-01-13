@@ -41,7 +41,7 @@ class Artwork(db.Model):
     description = db.Column(db.Text, nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
 
-    likes = db.relationship('ArtworkLike', backref='artwork', cascade='all, delete-orphan', lazy=True )
+    likes = db.relationship('ArtworkLike', back_populates='artwork', cascade='all, delete-orphan', lazy=True )
 
     def __repr__(self):
         return f"<Art {self.name}>"
@@ -64,7 +64,7 @@ class ArtworkLike(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
 
     # artwork = db.relationship('Artwork', backref=db.backref('likes', lazy=True))
-    artwork = db.relationship('Artwork')
+    artwork = db.relationship('Artwork', back_populates='likes')
 
     def __repr__(self):
         return f"<ArtworkLike artwork_id={self.artwork_id} user_id={self.user_id}>"
