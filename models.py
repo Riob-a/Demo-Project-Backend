@@ -39,7 +39,9 @@ class Artwork(db.Model):
     style = db.Column(db.String(100), nullable=False)
     image_url = db.Column(db.String(500), nullable=False)
     description = db.Column(db.Text, nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)  # Foreign key to User
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+
+    likes = db.relationship('ArtworkLike', backref='artwork', cascade='all, delete-orphan', lazy=True )
 
     def __repr__(self):
         return f"<Art {self.name}>"
