@@ -123,4 +123,3 @@ class Admin(db.Model):
             'role': self.role,
             'created_at': self.created_at.isoformat(),
         }
-
