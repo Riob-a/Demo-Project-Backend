@@ -4,6 +4,8 @@ from models import db, User, Artwork, Contact
 from flask import Flask
 from werkzeug.security import generate_password_hash
 import os
+from dotenv import load_dotenv
+load_dotenv()
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URI')
