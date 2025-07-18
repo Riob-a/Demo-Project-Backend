@@ -1,4 +1,4 @@
 .env
-myenv
+virtual
 backup.py
 /_pycache_/
